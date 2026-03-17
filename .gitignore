@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+.env
+
+# Models and data
+models/*.zip
+models/*.png
+models/evaluation_plot.png
+*.db
+*.sqlite
+
+# Docker
+.docker/
+
+# OS
+.DS_Store
+
+# Logs
+*.log

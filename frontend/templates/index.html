@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artemis AI - Trading Assistant</title>
+    <!-- Use Tailwind CSS via CDN for rapid styling of modern UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="bg-slate-900 text-white font-sans min-h-screen">
+    
+    <div class="fixed top-0 left-0 w-full h-full bg-gradient-to-br from-indigo-900 via-slate-900 to-black z-[-1]"></div>
+    
+    <div class="container mx-auto px-4 py-8">
+        
+        <header class="flex justify-between items-center mb-12 glassmorphism p-6 rounded-2xl">
+            <h1 class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+                <i class="fa-solid fa-robot mr-2"></i> Artemis AI
+            </h1>
+                <div class="flex items-center space-x-6">
+                    <div class="flex items-center bg-white/10 px-4 py-2 rounded-full border border-white/10">
+                        <label class="mr-2 text-xs uppercase tracking-wider text-gray-400 font-bold">Market</label>
+                        <select id="symbol-select" class="bg-transparent border-none focus:ring-0 text-sm font-semibold text-white outline-none cursor-pointer">
+                            <option value="BTC/USDT" class="bg-slate-900">BTC / USDT</option>
+                            <option value="ETH/USDT" class="bg-slate-900">ETH / USDT</option>
+                            <option value="SOL/USDT" class="bg-slate-900">SOL / USDT</option>
+                        </select>
+                    </div>
+                    <div class="px-4 py-2 rounded-full bg-slate-800/50 border border-white/5 flex items-center">
+                        <span id="market-sentiment" class="text-sm font-medium flex items-center">
+                            <i class="fa-solid fa-cloud mr-2 text-gray-400"></i> Sentiment: Neutral (0.00)
+                        </span>
+                    </div>
+                    <div id="system-status" class="flex items-center text-sm font-medium py-2 px-4 rounded-full bg-slate-800/80 border border-white/10">
+                        <span class="w-2 h-2 rounded-full bg-green-400 mr-2"></span>
+                        Agent: IDLE
+                    </div>
+                </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Left Panel: Chat Interface -->
+            <div class="col-span-1 glassmorphism rounded-2xl flex flex-col h-[70vh]">
+                <div class="p-4 border-b border-white/10 flex justify-between items-center">
+                    <h2 class="text-xl font-semibold"><i class="fa-solid fa-comments mr-2"></i> Strategy Copilot</h2>
+                </div>
+                
+                <div id="chat-messages" class="flex-grow p-4 overflow-y-auto space-y-4">
+                    <!-- Chat messages will appear here -->
+                    <div class="chat-bubble ai-msg">
+                        Hello! I am your AI Trading Assistant. You can ask me about the RL Grid Strategy, or check the current market sentiment based on recent news.
+                    </div>
+                </div>
+
+                <div class="p-4 border-t border-white/10 text-black">
+                    <form id="chat-form" class="flex space-x-2">
+                        <input type="text" id="chat-input" class="flex-grow rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all" placeholder="Ask about PPO or Grid params...">
+                        <button type="submit" class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 py-2 rounded-lg hover:shadow-lg hover:shadow-purple-500/30 transition-all font-semibold">Send</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Right Panel: Dashboard -->
+            <div class="col-span-2 space-y-8">
+                
+                <!-- Status & Control Panel -->
+                <div class="glassmorphism p-6 rounded-2xl">
+                    <h2 class="text-xl font-semibold mb-6"><i class="fa-solid fa-server mr-2"></i> RL Agent Control Center</h2>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="bg-slate-800/50 p-4 rounded-xl border border-white/5">
+                            <p class="text-sm text-gray-400 mb-1">Current Price (BTC)</p>
+                            <p class="text-2xl font-bold" id="dash-price">-- USDT</p>
+                        </div>
+                        <div class="bg-slate-800/50 p-4 rounded-xl border border-white/5">
+                            <p class="text-sm text-gray-400 mb-1">Grid Spread</p>
+                            <p class="text-2xl font-bold" id="dash-spread">-- %</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex space-x-4">
+                        <button id="btn-train" class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-xl hover:shadow-lg hover:shadow-green-500/30 transition-all font-semibold flex justify-center items-center">
+                            <i class="fa-solid fa-play mr-2"></i> Initialize Training Run
+                        </button>
+                        <button id="btn-eval" class="flex-1 bg-gradient-to-r from-indigo-500 to-blue-600 text-white px-6 py-3 rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-semibold flex justify-center items-center">
+                            <i class="fa-solid fa-chart-bar mr-2"></i> Evaluate Model (Static vs RL)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Charts Area -->
+                <div class="glassmorphism p-6 rounded-2xl flex flex-col space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-xl font-semibold"><i class="fa-solid fa-chart-line mr-2"></i> Market Dynamics & Trade Execution</h2>
+                        <div class="flex space-x-2">
+                             <span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">Buy Level</span>
+                             <span class="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded">Sell Level</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Candlestick Chart -->
+                    <div id="ohlcv-chart" class="w-full h-[450px] rounded-xl overflow-hidden bg-slate-900/50 border border-white/5 relative">
+                        <div id="chart-loading" class="absolute inset-0 flex items-center justify-center bg-slate-900/80 z-20">
+                            <p class="text-gray-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Initializing Market View...</p>
+                        </div>
+                    </div>
+
+                    <!-- Performance Chart (Net Worth) -->
+                    <div class="mt-4">
+                        <h3 class="text-sm font-bold uppercase tracking-widest text-gray-500 mb-3 ml-1">Strategy Performance vs Benchmark</h3>
+                        <div id="performance-chart" class="w-full h-[200px] rounded-xl overflow-hidden bg-slate-900/30 border border-white/5"></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    <script src="/static/app.js"></script>
+</body>
+</html>
