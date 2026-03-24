@@ -110,7 +110,14 @@ if st.sidebar.button("🚀 Run Full Evaluation"):
         ma_final = ma_worth[-1] if ma_worth else 10000
         
         col1.metric("Current Price", f"${df['close'].iloc[-1]:,.2f}")
-        col2.metric("RL Bot Performance", f"${rl_final:,.2f}", f"{((rl_final/10000)-1)*100:.2f}%")
+        
+        # RL Metric with Warning if needed
+        if not rl_worth:
+            col2.metric("RL Bot Performance", "$10,000.00", "OFFLINE", delta_color="off")
+            st.sidebar.error("🤖 RL Model Not Found! Falls back to Hold.")
+        else:
+            col2.metric("RL Bot Performance", f"${rl_final:,.2f}", f"{((rl_final/10000)-1)*100:.2f}%")
+            
         col3.metric("MA Cross Performance", f"${ma_final:,.2f}", f"{((ma_final/10000)-1)*100:.2f}%")
         col4.metric("Benchmark (Static)", f"${static_worth[-1]:,.2f}")
 
