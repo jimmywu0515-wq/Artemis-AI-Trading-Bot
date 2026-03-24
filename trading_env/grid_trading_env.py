@@ -106,6 +106,7 @@ class GridTradingEnv(gym.Env):
         # This is still a simulation, but more explicit.
         levels = [lower_bound + i * grid_step for i in range(self.grid_count + 1)]
         
+        for level in levels:
             # If price crossed from above to below level -> BUY
             if self.current_price > level and low <= level:
                 fee = (self.balance / self.grid_count) * self.trading_fee
