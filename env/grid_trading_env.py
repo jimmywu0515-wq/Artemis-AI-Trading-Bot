@@ -10,7 +10,7 @@ class GridTradingEnv(gym.Env):
     """
     metadata = {'render_modes': ['human']}
 
-    def __init__(self, df: pd.DataFrame, initial_balance: float = 10000.0, grid_count: int = 10):
+    def __init__(self, df: pd.DataFrame, initial_balance: float = 10000.0, grid_count: int = 10, trading_fee: float = 0.001):
         super(GridTradingEnv, self).__init__()
         
         self.df = df
@@ -46,6 +46,7 @@ class GridTradingEnv(gym.Env):
         self.current_price = 0.0
         self.grid_center = 0.0
         self.grid_width_pct = 0.05 # 5% default
+        self.trading_fee = trading_fee
         self.trade_history = [] # List of {'step': int, 'type': 'buy'/'sell', 'price': float}
 
     def _get_obs(self):
@@ -105,18 +106,20 @@ class GridTradingEnv(gym.Env):
         # This is still a simulation, but more explicit.
         levels = [lower_bound + i * grid_step for i in range(self.grid_count + 1)]
         
-        for level in levels:
             # If price crossed from above to below level -> BUY
             if self.current_price > level and low <= level:
-                self.trade_history.append({'step': self.current_step, 'type': 'buy', 'price': level})
-                # In real grid, we'd allocate capital here.
+                fee = (self.balance / self.grid_count) * self.trading_fee
+                self.balance -= fee # Deduct fee on Buy
+                self.trade_history.append({'step': self.current_step, 'type': 'buy', 'price': level, 'fee': fee})
+            
             # If price crossed from below to above level -> SELL
             if self.current_price < level and high >= level:
-                self.trade_history.append({'step': self.current_step, 'type': 'sell', 'price': level})
-                # Record profit (simplified)
-                profit = (self.balance / self.grid_count) * (grid_step / level)
-                self.grid_profit += profit
-                self.balance += profit
+                # Record profit (simplified grid math)
+                gross_profit = (self.balance / self.grid_count) * (grid_step / level)
+                fee = (gross_profit + (self.balance / self.grid_count)) * self.trading_fee
+                self.balance += (gross_profit - fee) # Deduct fee on Sell
+                self.grid_profit += (gross_profit - fee)
+                self.trade_history.append({'step': self.current_step, 'type': 'sell', 'price': level, 'fee': fee})
 
     def step(self, action):
         self.previous_net_worth = self.net_worth
@@ -149,12 +152,15 @@ class GridTradingEnv(gym.Env):
             # Calculate Drawdown
             drawdown = (self.max_net_worth - self.net_worth) / self.max_net_worth
             
-            # Reward Calculation: Sharpe Ratio variant
-            # Reward = Profit - Penalty * Drawdown
+            # Reward Calculation: Performance + Agility Variant
+            # Reward = Absolute Profit - (Reduced Penalty * Drawdown)
             profit = self.net_worth - self.previous_net_worth
-            lambda_penalty = 1000.0 # High penalty for drawdown
+            lambda_penalty = 1.0 # Significant reduction for "Aggressive Mode"
             
             reward = profit - (lambda_penalty * drawdown)
+            
+            # Bonus for hitting profit targets
+            if profit > 0: reward *= 1.1 # Encourages growth
             
         else:
             reward = 0.0

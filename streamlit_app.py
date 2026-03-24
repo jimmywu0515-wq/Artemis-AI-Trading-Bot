@@ -29,11 +29,12 @@ st.markdown("""
 
 st.title("🤖 Artemis AI Trading Dashboard")
 st.markdown("Professional Reinforcement Learning & Technical Strategy Analysis")
+st.info("💡 **Economic Mode:** Real-world 0.1% Trading Fees are now enabled for all strategies to ensure fair comparison.")
 
 # Sidebar Controls
 st.sidebar.header("🕹️ Control Center")
 symbol = st.sidebar.selectbox("Market Symbol", ["BTC/USDT", "ETH/USDT", "SOL/USDT"])
-lookback = st.sidebar.slider("Lookback Period (Hours)", 100, 2000, 1000, 100)
+lookback = st.sidebar.slider("Lookback Period (Hours)", 100, 2000, 1500, 100)
 buffer_pct = st.sidebar.slider("Sell Buffer %", 0.0, 5.0, 1.0, 0.1) / 100.0
 show_ma = st.sidebar.checkbox("Show Moving Averages (5/10)", value=True)
 
@@ -86,7 +87,7 @@ df = calculate_features(df)
 
 if st.sidebar.button("🚀 Run Full Evaluation"):
     with st.spinner("Analyzing Market Dynamics..."):
-        # Run Evaluation (now returns 11 values including static_trades)
+        # Run Evaluation
         (rl_worth, static_worth, prices, rl_trades, time_indices, 
          ma_worth, ma_trades, ma5, ma10, sensitivity, static_trades) = evaluate_agent(df, buffer_pct)
         
@@ -99,9 +100,9 @@ if st.sidebar.button("🚀 Run Full Evaluation"):
         col1.metric("Current Price", f"${df['close'].iloc[-1]:,.2f}")
         
         if not rl_worth:
-            col2.metric("RL Bot (AI Hybrid)", "$10,000.00", "OFFLINE")
+            col2.metric("RL Bot (Smart Aggressive)", "$10,000.00", "OFFLINE")
         else:
-            col2.metric("RL Bot (AI Hybrid)", f"${rl_final:,.2f}", f"{((rl_final/10000)-1)*100:.2f}%")
+            col2.metric("RL Bot (Smart Aggressive)", f"${rl_final:,.2f}", f"{((rl_final/10000)-1)*100:.2f}%")
             
         col3.metric("MA Cross Strategy", f"${ma_final:,.2f}", f"{((ma_final/10000)-1)*100:.2f}%")
         col4.metric("Static Grid Baseline", f"${static_final:,.2f}", f"{((static_final/10000)-1)*100:.2f}%")
@@ -115,7 +116,6 @@ if st.sidebar.button("🚀 Run Full Evaluation"):
             fig.add_trace(go.Scatter(x=df.index, y=df['ma10'], line=dict(color='blue', width=1, dash='dot'), name="10 MA"), row=1, col=1)
 
         # Plot All Trades
-        # RL: Cyan/Magenta Triangles
         for t in rl_trades:
             if t['step'] < len(df):
                 color = "#00FFFF" if t['type'] == 'buy' else "#FF00FF"
@@ -123,7 +123,6 @@ if st.sidebar.button("🚀 Run Full Evaluation"):
                              marker=dict(symbol="triangle-up" if t['type']=='buy' else "triangle-down", color=color, size=12), 
                              name=f"RL {t['type'].upper()}"), row=1, col=1)
 
-        # MA: Orange/Yellow Diamonds
         for t in ma_trades:
             if t['step'] < len(df):
                 color = "#F59E0B" if t['type'] == 'buy' else "#FBBF24"
@@ -140,18 +139,19 @@ if st.sidebar.button("🚀 Run Full Evaluation"):
         st.plotly_chart(fig, use_container_width=True)
 
         # Combined Trade History Table
-        st.subheader("📝 Master Trade History (Comparing All Strategies)")
+        st.subheader("📝 Master Trade History (Fee Aware)")
         
         combined_trades = []
-        
         def add_to_combined(trades, strategy_name):
             for t in trades:
                 if t['step'] < len(df):
+                    fee_val = t.get('fee', 0.0)
                     combined_trades.append({
                         "Time": df.index[t['step']],
                         "Strategy": strategy_name,
                         "Action": t['type'].upper(),
-                        "Price": t['price']
+                        "Price": t['price'],
+                        "Fee Paid": fee_val
                     })
         
         add_to_combined(rl_trades, "RL Agent")
@@ -162,9 +162,17 @@ if st.sidebar.button("🚀 Run Full Evaluation"):
             trade_df = pd.DataFrame(combined_trades).sort_values(by="Time", ascending=False)
             trade_df["Time"] = trade_df["Time"].dt.strftime('%Y-%m-%d %H:%M')
             trade_df["Price"] = trade_df["Price"].map("${:,.2f}".format)
+            trade_df["Fee Paid"] = trade_df["Fee Paid"].map("${:,.2f}".format)
             st.dataframe(trade_df, use_container_width=True)
         else:
-            st.info("No trades executed by any strategy in this period.")
+            st.info("No trades executed.")
+
+        # Aggressive Mode Insights
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### 🛠️ Optimization Active")
+        st.sidebar.write("- Risk Reward Ratio refined")
+        st.sidebar.write("- Transaction Costs modelled")
+        st.sidebar.write("- Drawdown tolerance increased")
 
         # Sensitivity Analysis
         st.subheader("📊 MA Strategy Buffer Sensitivity")
@@ -181,4 +189,4 @@ else:
     st.image("https://images.unsplash.com/photo-1611974717484-2a62372f4f2c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80", caption="Artemis AI - Multi-Strategy Platform Ready")
 
 st.sidebar.markdown("---")
-st.sidebar.info("Developed by Artemis AI Systems. Full Strategy Comparison Active.")
+st.sidebar.info("Developed by Artemis AI Systems. Aggressive Optimization Active.")

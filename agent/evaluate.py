@@ -19,6 +19,7 @@ def calculate_ma_strategy(df: pd.DataFrame, buffer_pct: float = 0.0):
     
     balance = 10000.0 # Starting USDT
     holdings = 0.0    # Starting Crypto
+    trading_fee = 0.001 # 0.1% fee
     
     # Pre-calculate signals
     ma5 = df['ma5']
@@ -32,21 +33,27 @@ def calculate_ma_strategy(df: pd.DataFrame, buffer_pct: float = 0.0):
         
         # Check Buy Signal: 5MA > 10MA
         if m5 > m10 and balance > 0:
-            holdings += balance / price
+            buy_amount = balance
+            fee = buy_amount * trading_fee
+            holdings += (buy_amount - fee) / price
             balance = 0
-            trades.append({'step': i, 'type': 'buy', 'price': price})
+            trades.append({'step': i, 'type': 'buy', 'price': price, 'fee': fee})
             
         # Check Sell Signal
         elif holdings > 0 and price < m5 * (1 - buffer_pct):
             if price < m10 * (1 - buffer_pct):
-                balance += holdings * price
+                sell_val = holdings * price
+                fee = sell_val * trading_fee
+                balance += (sell_val - fee)
                 holdings = 0
-                trades.append({'step': i, 'type': 'sell', 'price': price})
+                trades.append({'step': i, 'type': 'sell', 'price': price, 'fee': fee})
             else:
                 sell_amount = holdings * 0.5
-                balance += sell_amount * price
+                sell_val = sell_amount * price
+                fee = sell_val * trading_fee
+                balance += (sell_val - fee)
                 holdings -= sell_amount
-                trades.append({'step': i, 'type': 'sell', 'price': price})
+                trades.append({'step': i, 'type': 'sell', 'price': price, 'fee': fee})
                 
         net_worths.append(balance + holdings * price)
         
