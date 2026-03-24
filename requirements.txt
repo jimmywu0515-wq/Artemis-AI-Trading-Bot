@@ -10,8 +10,11 @@ fastapi>=0.100.0
 uvicorn>=0.23.0
 matplotlib>=3.7.0
 python-dotenv>=1.0.0
-streamlit
-plotly
+streamlit>=1.32.0
+plotly>=5.18.0
+altair<5
+watchdog
+nbformat
 langchain
 langchain-openai
 langchain-community
