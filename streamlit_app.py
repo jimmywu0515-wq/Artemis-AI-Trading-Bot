@@ -37,7 +37,7 @@ show_ma = st.sidebar.checkbox("Show Moving Averages (5/10)", value=True)
 
 @st.cache_data(ttl=300)
 def get_data(symbol):
-    """Fetches data from DB or falls back to live Binance API."""
+    """Fetches data from DB or falls back to live Kraken/Binance API."""
     dsn = "postgresql://postgres:postgres@db:5432/crypto"
     db = TimescaleDB(dsn)
     
@@ -57,29 +57,31 @@ def get_data(symbol):
         if df_db is not None and not df_db.empty:
             return df_db
     except Exception:
-        pass # Silently fail and try live API
+        pass 
 
     # 2. Try Live API (Cloud Environment)
-    try:
-        exchange = ccxt.binance({
-            'enableRateLimit': True,
-            'options': {'defaultType': 'spot'}
-        })
-        # Fetch last 500 hours (approx 20 days)
-        limit = 500
-        timeframe = '1h'
-        ohlcv = exchange.fetch_ohlcv(symbol.replace("/", ""), timeframe=timeframe, limit=limit)
-        
-        df_live = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-        df_live['timestamp'] = pd.to_datetime(df_live['timestamp'], unit='ms')
-        df_live.set_index('timestamp', inplace=True)
-        
-        if not df_live.empty:
-            return df_live
-    except Exception as e:
-        st.sidebar.error(f"⚠️ Live Data Error: {str(e)}")
+    # We use Kraken as primary because Binance is restricted on many cloud servers (US nodes)
+    exchanges_to_try = [ccxt.kraken(), ccxt.binance(), ccxt.kucoin()]
+    
+    for exchange in exchanges_to_try:
+        try:
+            # Normalize symbol for the exchange
+            search_symbol = symbol if exchange.id != 'binance' else symbol.replace("/", "")
+            ohlcv = exchange.fetch_ohlcv(symbol, timeframe='1h', limit=500)
+            
+            df_live = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+            df_live['timestamp'] = pd.to_datetime(df_live['timestamp'], unit='ms')
+            df_live.set_index('timestamp', inplace=True)
+            
+            if not df_live.empty:
+                st.sidebar.success(f"✅ Live Data: {exchange.id.upper()}")
+                return df_live
+        except Exception as e:
+            continue
 
-    # 3. Last Resort: Random Mock Data (if offline & API blocked)
+    st.sidebar.error("⚠️ All Life Data APIs Restricted or Offline.")
+    
+    # 3. Last Resort: Random Mock Data
     dates = pd.date_range(end=datetime.now(), periods=500, freq='H')
     base_price = 65000 if "BTC" in symbol else (3500 if "ETH" in symbol else 150)
     prices = base_price + np.cumsum(np.random.randn(500) * (base_price * 0.01))
@@ -159,4 +161,4 @@ else:
     st.image("https://images.unsplash.com/photo-1611974717484-2a62372f4f2c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80", caption="Artemis AI - Advanced Market Analysis")
 
 st.sidebar.markdown("---")
-st.sidebar.info("Developed by Artemis AI Systems. Live Market Data via Binance API.")
+st.sidebar.info("Developed by Artemis AI Systems. Multi-Exchange Failover Enabled.")
