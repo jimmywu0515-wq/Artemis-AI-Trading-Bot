@@ -7,7 +7,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 # Add root folder to sys.path to resolve imports cleanly
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from env.grid_trading_env import GridTradingEnv
+from trading_env.grid_trading_env import GridTradingEnv
 from data.indicators import calculate_features
 from data.database import TimescaleDB
 import asyncio

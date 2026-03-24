@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 .venv/
-# env/ (removed to allow trading env code)
+# trading_env/ (renamed from env to avoid cloud conflicts)
 venv/
 ENV/
 .env

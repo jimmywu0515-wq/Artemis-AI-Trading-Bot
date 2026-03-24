@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from stable_baselines3 import PPO
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from env.grid_trading_env import GridTradingEnv
+from trading_env.grid_trading_env import GridTradingEnv
 
 def calculate_ma_strategy(df: pd.DataFrame, buffer_pct: float = 0.0):
     """
