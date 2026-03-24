@@ -33,11 +33,12 @@ st.markdown("Professional Reinforcement Learning & Technical Strategy Analysis")
 # Sidebar Controls
 st.sidebar.header("🕹️ Control Center")
 symbol = st.sidebar.selectbox("Market Symbol", ["BTC/USDT", "ETH/USDT", "SOL/USDT"])
+lookback = st.sidebar.slider("Lookback Period (Hours)", 100, 2000, 1000, 100)
 buffer_pct = st.sidebar.slider("Sell Buffer %", 0.0, 5.0, 1.0, 0.1) / 100.0
 show_ma = st.sidebar.checkbox("Show Moving Averages (5/10)", value=True)
 
 @st.cache_data(ttl=300)
-def get_data(symbol):
+def get_data(symbol, limit=1000):
     """Fetches data from DB or falls back to live Kraken/Binance API."""
     dsn = "postgresql://postgres:postgres@db:5432/crypto"
     db = TimescaleDB(dsn)
@@ -55,14 +56,14 @@ def get_data(symbol):
         
         df_db = loop.run_until_complete(fetch())
         if df_db is not None and not df_db.empty:
-            return df_db
+            return df_db.tail(limit)
     except Exception:
         pass 
 
     exchanges_to_try = [ccxt.kraken(), ccxt.binance(), ccxt.kucoin()]
     for exchange in exchanges_to_try:
         try:
-            ohlcv = exchange.fetch_ohlcv(symbol, timeframe='1h', limit=500)
+            ohlcv = exchange.fetch_ohlcv(symbol, timeframe='1h', limit=limit)
             df_live = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
             df_live['timestamp'] = pd.to_datetime(df_live['timestamp'], unit='ms')
             df_live.set_index('timestamp', inplace=True)
@@ -73,35 +74,37 @@ def get_data(symbol):
             continue
 
     st.sidebar.error("⚠️ All Live Data APIs Restricted. Using Simulation.")
-    dates = pd.date_range(end=datetime.now(), periods=500, freq='H')
+    dates = pd.date_range(end=datetime.now(), periods=limit, freq='H')
     base_price = 65000 if "BTC" in symbol else (3500 if "ETH" in symbol else 150)
-    prices = base_price + np.cumsum(np.random.randn(500) * (base_price * 0.01))
-    df_mock = pd.DataFrame({'open': prices * 0.999, 'high': prices * 1.005, 'low': prices * 0.995, 'close': prices, 'volume': np.random.rand(500) * 100}, index=dates)
+    prices = base_price + np.cumsum(np.random.randn(limit) * (base_price * 0.01))
+    df_mock = pd.DataFrame({'open': prices * 0.999, 'high': prices * 1.005, 'low': prices * 0.995, 'close': prices, 'volume': np.random.rand(limit) * 100}, index=dates)
     return df_mock
 
 # Execution
-df = get_data(symbol)
+df = get_data(symbol, lookback)
 df = calculate_features(df)
 
 if st.sidebar.button("🚀 Run Full Evaluation"):
     with st.spinner("Analyzing Market Dynamics..."):
-        rl_worth, static_worth, prices, rl_trades, times, ma_worth, ma_trades, ma5, ma10, sensitivity = evaluate_agent(df, buffer_pct)
+        # Run Evaluation (now returns 11 values including static_trades)
+        (rl_worth, static_worth, prices, rl_trades, time_indices, 
+         ma_worth, ma_trades, ma5, ma10, sensitivity, static_trades) = evaluate_agent(df, buffer_pct)
         
         # Metrics Row
         col1, col2, col3, col4 = st.columns(4)
         rl_final = rl_worth[-1] if rl_worth else 10000
         ma_final = ma_worth[-1] if ma_worth else 10000
+        static_final = static_worth[-1] if static_worth else 10000
         
         col1.metric("Current Price", f"${df['close'].iloc[-1]:,.2f}")
         
         if not rl_worth:
-            col2.metric("RL Bot Performance", "$10,000.00", "OFFLINE", delta_color="off")
-            st.sidebar.error("🤖 RL Model Not Found!")
+            col2.metric("RL Bot (AI Hybrid)", "$10,000.00", "OFFLINE")
         else:
             col2.metric("RL Bot (AI Hybrid)", f"${rl_final:,.2f}", f"{((rl_final/10000)-1)*100:.2f}%")
             
         col3.metric("MA Cross Strategy", f"${ma_final:,.2f}", f"{((ma_final/10000)-1)*100:.2f}%")
-        col4.metric("Static Grid Baseline", f"${static_worth[-1]:,.2f}")
+        col4.metric("Static Grid Baseline", f"${static_final:,.2f}", f"{((static_final/10000)-1)*100:.2f}%")
 
         # Main Candlestick Chart
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.7, 0.3])
@@ -111,42 +114,60 @@ if st.sidebar.button("🚀 Run Full Evaluation"):
             fig.add_trace(go.Scatter(x=df.index, y=df['ma5'], line=dict(color='orange', width=1, dash='dot'), name="5 MA"), row=1, col=1)
             fig.add_trace(go.Scatter(x=df.index, y=df['ma10'], line=dict(color='blue', width=1, dash='dot'), name="10 MA"), row=1, col=1)
 
-        # RL Trade Markers (Distinct Colors: Cyan for Buy, Magenta for Sell)
+        # Plot All Trades
+        # RL: Cyan/Magenta Triangles
         for t in rl_trades:
             if t['step'] < len(df):
-                color = "#00FFFF" if t['type'] == 'buy' else "#FF00FF" # Cyan / Magenta
-                symbol_m = "triangle-up" if t['type'] == 'buy' else "triangle-down"
-                fig.add_trace(go.Scatter(x=[df.index[t['step']]], y=[t['price']], mode="markers+text", 
-                                       text=[t['type'].upper()], textposition="top center",
-                                       marker=dict(symbol=symbol_m, color=color, size=12, line=dict(width=1, color="white")), 
-                                       name=f"RL {t['type'].upper()}"), row=1, col=1)
+                color = "#00FFFF" if t['type'] == 'buy' else "#FF00FF"
+                fig.add_trace(go.Scatter(x=[df.index[t['step']]], y=[t['price']], mode="markers", 
+                             marker=dict(symbol="triangle-up" if t['type']=='buy' else "triangle-down", color=color, size=12), 
+                             name=f"RL {t['type'].upper()}"), row=1, col=1)
+
+        # MA: Orange/Yellow Diamonds
+        for t in ma_trades:
+            if t['step'] < len(df):
+                color = "#F59E0B" if t['type'] == 'buy' else "#FBBF24"
+                fig.add_trace(go.Scatter(x=[df.index[t['step']]], y=[t['price']], mode="markers", 
+                             marker=dict(symbol="diamond", color=color, size=8), 
+                             name=f"MA {t['type'].upper()}"), row=1, col=1)
 
         # Performance Chart
         fig.add_trace(go.Scatter(x=df.index, y=rl_worth, line=dict(color='#8b5cf6', width=2), name="RL Strategy"), row=2, col=1)
         fig.add_trace(go.Scatter(x=df.index, y=ma_worth, line=dict(color='#f59e0b', width=1), name="MA Strategy"), row=2, col=1)
         fig.add_trace(go.Scatter(x=df.index, y=static_worth, line=dict(color='#64748b', width=1, dash='dot'), name="Static Baseline"), row=2, col=1)
 
-        fig.update_layout(height=800, template="plotly_dark", showlegend=True, xaxis_rangeslider_visible=False, margin=dict(l=0, r=0, t=30, b=0))
+        fig.update_layout(height=800, template="plotly_dark", showlegend=False, xaxis_rangeslider_visible=False, margin=dict(l=0, r=0, t=30, b=0))
         st.plotly_chart(fig, use_container_width=True)
 
-        # Trade History Table
-        st.subheader("📝 RL Bot Trade History")
-        if rl_trades:
-            trade_data = []
-            for t in rl_trades:
+        # Combined Trade History Table
+        st.subheader("📝 Master Trade History (Comparing All Strategies)")
+        
+        combined_trades = []
+        
+        def add_to_combined(trades, strategy_name):
+            for t in trades:
                 if t['step'] < len(df):
-                    trade_data.append({
-                        "Time": df.index[t['step']].strftime('%Y-%m-%d %H:%M'),
+                    combined_trades.append({
+                        "Time": df.index[t['step']],
+                        "Strategy": strategy_name,
                         "Action": t['type'].upper(),
-                        "Price": f"${t['price']:,.2f}",
-                        "Strategy": "RL Agent"
+                        "Price": t['price']
                     })
-            st.dataframe(pd.DataFrame(trade_data), use_container_width=True)
+        
+        add_to_combined(rl_trades, "RL Agent")
+        add_to_combined(ma_trades, "MA Cross")
+        add_to_combined(static_trades, "Static Grid")
+        
+        if combined_trades:
+            trade_df = pd.DataFrame(combined_trades).sort_values(by="Time", ascending=False)
+            trade_df["Time"] = trade_df["Time"].dt.strftime('%Y-%m-%d %H:%M')
+            trade_df["Price"] = trade_df["Price"].map("${:,.2f}".format)
+            st.dataframe(trade_df, use_container_width=True)
         else:
-            st.info("No RL trades executed in this period.")
+            st.info("No trades executed by any strategy in this period.")
 
         # Sensitivity Analysis
-        st.subheader("📊 Sell Buffer Sensitivity Analysis")
+        st.subheader("📊 MA Strategy Buffer Sensitivity")
         sens_df = pd.DataFrame(sensitivity)
         fig_sens = go.Figure()
         fig_sens.add_trace(go.Bar(x=sens_df['buffer'], y=sens_df['net_worth'], marker_color='orange', name="MA Performance"))
@@ -157,7 +178,7 @@ if st.sidebar.button("🚀 Run Full Evaluation"):
 
 else:
     st.info("👈 Use the Sidebar to configure your strategy and click 'Run Full Evaluation' to begin!")
-    st.image("https://images.unsplash.com/photo-1611974717484-2a62372f4f2c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80", caption="Artemis AI - Market Analysis Ready")
+    st.image("https://images.unsplash.com/photo-1611974717484-2a62372f4f2c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80", caption="Artemis AI - Multi-Strategy Platform Ready")
 
 st.sidebar.markdown("---")
-st.sidebar.info("Developed by Artemis AI Systems. Multi-Exchange Enabled.")
+st.sidebar.info("Developed by Artemis AI Systems. Full Strategy Comparison Active.")

@@ -94,11 +94,13 @@ def evaluate_agent(df: pd.DataFrame, buffer_pct: float = 0.0, model_path: str = 
     # Evaluate Static Grid
     static_env = GridTradingEnv(df)
     static_net_worths = []
+    static_trades = []
     obs, _ = static_env.reset()
     done = False
     while not done:
         obs, reward, done, truncated, info = static_env.step([0.0, 0.0])
         static_net_worths.append(info['net_worth'])
+        static_trades = info.get('trades', [])
         if done or truncated: break
 
     # Evaluate MA Strategy
@@ -113,7 +115,9 @@ def evaluate_agent(df: pd.DataFrame, buffer_pct: float = 0.0, model_path: str = 
     ma5_history = df['ma5'].tolist() if 'ma5' in df else []
     ma10_history = df['ma10'].tolist() if 'ma10' in df else []
     
-    return rl_net_worths, static_net_worths, price_history, rl_trades, time_indices, ma_worths, ma_trades, ma5_history, ma10_history, sensitivity_data
+    return (rl_net_worths, static_net_worths, price_history, rl_trades, 
+            time_indices, ma_worths, ma_trades, ma5_history, ma10_history, 
+            sensitivity_data, static_trades)
 
 if __name__ == "__main__":
     pass
