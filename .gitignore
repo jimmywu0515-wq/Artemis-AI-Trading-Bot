@@ -9,7 +9,7 @@ ENV/
 .env
 
 # Models and data
-models/*.zip
+# models/*.zip (enabled for demo deployment)
 models/*.png
 models/evaluation_plot.png
 *.db
