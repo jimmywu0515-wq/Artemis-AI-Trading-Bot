@@ -20,6 +20,10 @@ def calculate_features(df: pd.DataFrame) -> pd.DataFrame:
     # Calculate RSI (Relative Strength Index)
     indicator_rsi = ta.momentum.RSIIndicator(close=df['close'], window=14)
     df['rsi'] = indicator_rsi.rsi()
+
+    # Calculate 5 MA and 10 MA for the new technical strategy
+    df['ma5'] = df['close'].rolling(window=5).mean()
+    df['ma10'] = df['close'].rolling(window=10).mean()
         
     # Drop rows with NaN values resulting from indicator calculations
     df.dropna(inplace=True)

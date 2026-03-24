@@ -8,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=1711310000">
 </head>
 <body class="bg-slate-900 text-white font-sans min-h-screen">
     
@@ -82,13 +82,33 @@
                         </div>
                     </div>
                     
-                    <div class="flex space-x-4">
+                    <div class="flex space-x-4 mb-6">
                         <button id="btn-train" class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-xl hover:shadow-lg hover:shadow-green-500/30 transition-all font-semibold flex justify-center items-center">
                             <i class="fa-solid fa-play mr-2"></i> Initialize Training Run
                         </button>
                         <button id="btn-eval" class="flex-1 bg-gradient-to-r from-indigo-500 to-blue-600 text-white px-6 py-3 rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-semibold flex justify-center items-center">
-                            <i class="fa-solid fa-chart-bar mr-2"></i> Evaluate Model (Static vs RL)
+                            <i class="fa-solid fa-chart-bar mr-2"></i> Run Full Evaluation
                         </button>
+                    </div>
+
+                    <div class="pt-6 border-t border-white/10 grid grid-cols-2 gap-8">
+                        <div class="flex flex-col space-y-3">
+                             <div class="flex justify-between items-center">
+                                <label class="text-xs font-bold uppercase tracking-widest text-gray-400">Technical Strategy Sell Buffer</label>
+                                <span id="buffer-val" class="text-sm font-bold text-indigo-400">1.0%</span>
+                             </div>
+                             <input type="range" id="buffer-slider" min="0" max="5" step="0.1" value="1.0" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                             <p class="text-[10px] text-gray-500 italic leading-relaxed">Sells 50% below 5MA, 100% below 10MA</p>
+                        </div>
+                        <div class="flex flex-col space-y-2 justify-center">
+                            <label class="flex items-center space-x-3 cursor-pointer group">
+                                <div class="relative">
+                                    <input type="checkbox" id="toggle-ma" class="sr-only peer" checked>
+                                    <div class="w-10 h-6 bg-slate-700 rounded-full peer peer-checked:bg-indigo-600 transition-all after:content-[''] after:absolute after:top-1 after:left-1 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
+                                </div>
+                                <span class="text-xs font-bold uppercase tracking-widest text-gray-400 group-hover:text-white transition-colors">Show MA Lines (5/10)</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -114,11 +134,26 @@
                         <h3 class="text-sm font-bold uppercase tracking-widest text-gray-500 mb-3 ml-1">Strategy Performance vs Benchmark</h3>
                         <div id="performance-chart" class="w-full h-[200px] rounded-xl overflow-hidden bg-slate-900/30 border border-white/5"></div>
                     </div>
+
+                    <!-- Sensitivity Analysis -->
+                    <div class="mt-6 pt-6 border-t border-white/10">
+                        <h3 class="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4 ml-1">Sell Buffer Sensitivity Analysis (Net Worth vs Buffer %)</h3>
+                        <div id="sensitivity-container" class="w-full h-[150px] bg-slate-900/20 rounded-xl p-4 flex items-end space-x-2 border border-white/5 relative">
+                            <!-- Bars will be injected here -->
+                            <div id="sensitivity-empty" class="absolute inset-0 flex items-center justify-center text-xs text-gray-600 italic">
+                                Run evaluation to see sensitivity analysis...
+                            </div>
+                        </div>
+                        <div class="flex justify-between mt-2 px-1">
+                            <span class="text-[10px] text-gray-500">0% Buffer</span>
+                            <span class="text-[10px] text-gray-500">5% Buffer</span>
+                        </div>
+                    </div>
                 </div>
 
             </div>
         </div>
     </div>
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=1711310000"></script>
 </body>
 </html>

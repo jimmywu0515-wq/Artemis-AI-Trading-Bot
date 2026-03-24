@@ -28,6 +28,9 @@ If you don't know the answer or the context doesn't contain it, just say that yo
 Context:
 {context}
 
+If the user wants to change a setting (like buffer percent or strategy), include a tag at the end of your response:
+[COMMAND: {{"type": "buffer", "value": 1.5}}] or [COMMAND: {{"type": "toggle_ma", "value": true}}]
+
 Question: {question}
 
 Answer:"""
@@ -45,11 +48,31 @@ Answer:"""
             )
             
     def ask(self, query: str) -> str:
+        # Simple local command parser (works even if offline)
+        cmd_tag = ""
+        import re
+        
+        # Buffer pattern: "set buffer to 2.5", "buffer 1.0%"
+        buffer_match = re.search(r"buffer.*?(\d+\.?\d*)", query.lower())
+        if buffer_match:
+            val = float(buffer_match.group(1))
+            cmd_tag = f" [COMMAND: {{\"type\": \"buffer\", \"value\": {val}}}]"
+            
+        # MA Toggle pattern: "show ma", "hide ma", "toggle ma"
+        if "show ma" in query.lower() or "enable ma" in query.lower():
+            cmd_tag += f" [COMMAND: {{\"type\": \"toggle_ma\", \"value\": true}}]"
+        elif "hide ma" in query.lower() or "disable ma" in query.lower():
+            cmd_tag += f" [COMMAND: {{\"type\": \"toggle_ma\", \"value\": false}}]"
+
         if not self.chain:
             # Fallback if no LLM/API KEY
+            response = "Knowledge base or LLM API Key is currently offline."
             if "ppo" in query.lower():
-                return "I'm offline, but I utilize PPO models with customized Sharpe Ratio penalizations for deep-drawdowns."
-            return "Knowledge base or LLM API Key is currently offline."
+                response = "I'm offline, but I utilize PPO models with customized Sharpe Ratio penalizations."
+            elif buffer_match or "ma" in query.lower():
+                response = "Understood. I've updated the dashboard settings as requested."
+            
+            return response + cmd_tag
             
         try:
              response = self.chain.invoke(query)

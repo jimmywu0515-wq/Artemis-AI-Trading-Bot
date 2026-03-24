@@ -123,17 +123,16 @@ async def get_status():
     return bot_state
 
 @app.get("/evaluate")
-async def get_evaluation(dsn: str, symbol: str = "BTC/USDT"):
+async def get_evaluation(dsn: str, symbol: str = "BTC/USDT", buffer_pct: float = 0.0):
     try:
         df = await load_data(dsn, symbol)
         if df.empty:
             return {"error": "No data available for evaluation"}
         
-        # evaluation now returns 5 values
-        rl_worth, static_worth, prices, trades, times = evaluate_agent(df)
+        # evaluation now returns 10 values
+        rl_worth, static_worth, prices, rl_trades, times, ma_worth, ma_trades, ma5, ma10, sensitivity = evaluate_agent(df, buffer_pct)
         
         # Format OHLCV for Lightweight Charts
-        # [{time: ..., open: ..., high: ..., low: ..., close: ...}]
         ohlcv_data = []
         for i, (idx, row) in enumerate(df.iterrows()):
             ohlcv_data.append({
@@ -144,12 +143,21 @@ async def get_evaluation(dsn: str, symbol: str = "BTC/USDT"):
                 "close": row['close']
             })
 
-        # Format Trades
-        formatted_trades = []
-        for t in trades:
-            # t['step'] is index in times/prices
+        # Format RL Trades
+        formatted_rl_trades = []
+        for t in rl_trades:
             if t['step'] < len(times):
-                formatted_trades.append({
+                formatted_rl_trades.append({
+                    "time": int(times[t['step']].timestamp()),
+                    "type": t['type'],
+                    "price": t['price']
+                })
+        
+        # Format MA Trades
+        formatted_ma_trades = []
+        for t in ma_trades:
+            if t['step'] < len(times):
+                formatted_ma_trades.append({
                     "time": int(times[t['step']].timestamp()),
                     "type": t['type'],
                     "price": t['price']
@@ -158,8 +166,13 @@ async def get_evaluation(dsn: str, symbol: str = "BTC/USDT"):
         return {
             "rl_net_worth": rl_worth,
             "static_net_worth": static_worth,
+            "ma_net_worth": ma_worth,
             "ohlcv": ohlcv_data,
-            "trades": formatted_trades,
+            "rl_trades": formatted_rl_trades,
+            "ma_trades": formatted_ma_trades,
+            "ma5": ma5,
+            "ma10": ma10,
+            "sensitivity": sensitivity,
             "plot_saved_at": "models/evaluation_plot.png"
         }
     except Exception as e:

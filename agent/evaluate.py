@@ -7,66 +7,113 @@ from stable_baselines3 import PPO
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from env.grid_trading_env import GridTradingEnv
 
-def evaluate_agent(df: pd.DataFrame, model_path: str = "models/ppo_grid_bot.zip"):
-    if not os.path.exists(model_path):
-        print(f"Model {model_path} not found.")
-        return [], [], [], []
-
-    # Load Model
-    model = PPO.load(model_path)
+def calculate_ma_strategy(df: pd.DataFrame, buffer_pct: float = 0.0):
+    """
+    Implements a 5MA/10MA Cross Strategy with user-defined buffer.
+    - Buy (all in) when 5MA > 10MA (Golden Cross)
+    - Sell 50% when Price < 5MA * (1 - buffer)
+    - Sell 100% when Price < 10MA * (1 - buffer)
+    """
+    net_worths = []
+    trades = []
     
-    # Setup environments
-    rl_env = GridTradingEnv(df)
-    static_env = GridTradingEnv(df)
-
-    # Evaluate RL Agent
-    obs, _ = rl_env.reset()
-    rl_net_worths = []
-    trades = [] # Track trade indices and actions
+    balance = 10000.0 # Starting USDT
+    holdings = 0.0    # Starting Crypto
     
-    done = False
-    while not done:
-        action, _states = model.predict(obs, deterministic=True)
-        obs, reward, done, truncated, info = rl_env.step(action)
-        rl_net_worths.append(info['net_worth'])
-        trades = info.get('trades', []) # The env keeps the full list
+    # Pre-calculate signals
+    ma5 = df['ma5']
+    ma10 = df['ma10']
+    prices = df['close']
+    
+    for i in range(len(df)):
+        price = prices.iloc[i]
+        m5 = ma5.iloc[i]
+        m10 = ma10.iloc[i]
         
-        if done or truncated:
-            break
+        # Check Buy Signal: 5MA > 10MA
+        if m5 > m10 and balance > 0:
+            holdings += balance / price
+            balance = 0
+            trades.append({'step': i, 'type': 'buy', 'price': price})
+            
+        # Check Sell Signal
+        elif holdings > 0 and price < m5 * (1 - buffer_pct):
+            if price < m10 * (1 - buffer_pct):
+                balance += holdings * price
+                holdings = 0
+                trades.append({'step': i, 'type': 'sell', 'price': price})
+            else:
+                sell_amount = holdings * 0.5
+                balance += sell_amount * price
+                holdings -= sell_amount
+                trades.append({'step': i, 'type': 'sell', 'price': price})
+                
+        net_worths.append(balance + holdings * price)
+        
+    return net_worths, trades
 
-    # Evaluate Static Grid
-    obs, _ = static_env.reset()
-    static_net_worths = []
+def run_sensitivity_analysis(df: pd.DataFrame, start_pct: float = 0.0, end_pct: float = 0.05, steps: int = 11):
+    """
+    Evaluates the MA strategy across a range of buffer percentages.
+    Returns a list of {'buffer': pct, 'net_worth': final_value}
+    """
+    results = []
+    import numpy as np
     
+    # Generate range from start to end (e.g., 0.0 to 0.05)
+    buffers = np.linspace(start_pct, end_pct, steps)
+    
+    for b in buffers:
+        worths, _ = calculate_ma_strategy(df, b)
+        final_worth = worths[-1] if worths else 10000.0
+        results.append({"buffer": float(round(b * 100, 2)), "net_worth": float(final_worth)})
+        
+    return results
+
+def evaluate_agent(df: pd.DataFrame, buffer_pct: float = 0.0, model_path: str = "models/ppo_grid_bot.zip"):
+    # Load Model
+    model = None
+    if os.path.exists(model_path):
+        model = PPO.load(model_path)
+    
+    rl_net_worths = []
+    rl_trades = []
+    
+    if model:
+        # Evaluate RL Agent
+        rl_env = GridTradingEnv(df)
+        obs, _ = rl_env.reset()
+        done = False
+        while not done:
+            action, _states = model.predict(obs, deterministic=True)
+            obs, reward, done, truncated, info = rl_env.step(action)
+            rl_net_worths.append(info['net_worth'])
+            rl_trades = info.get('trades', [])
+            if done or truncated: break
+    
+    # Evaluate Static Grid
+    static_env = GridTradingEnv(df)
+    static_net_worths = []
+    obs, _ = static_env.reset()
     done = False
     while not done:
-        # Action [0, 0] means no change to grid width and no shift to grid center
         obs, reward, done, truncated, info = static_env.step([0.0, 0.0])
         static_net_worths.append(info['net_worth'])
-        
-        if done or truncated:
-            break
+        if done or truncated: break
 
-    # Plot Comparison (Legacy)
-    plt.figure(figsize=(12, 6))
-    plt.plot(rl_net_worths, label='RL Dynamic Grid Bot')
-    plt.plot(static_net_worths, label='Static Grid Bot')
-    plt.title('RL Grid Bot vs Static Grid Bot Performance')
-    plt.legend()
-    plt.grid(True)
+    # Evaluate MA Strategy
+    ma_worths, ma_trades = calculate_ma_strategy(df, buffer_pct)
     
-    plot_path = "models/evaluation_plot.png"
-    plt.savefig(plot_path)
-    plt.close() # Clean up
+    # Run Sensitivity Analysis
+    sensitivity_data = run_sensitivity_analysis(df)
     
     # Return all info for frontend
-    # price_history is useful for the chart
     price_history = df['close'].tolist()
-    # Also need time indices for plotting trades
     time_indices = df.index.tolist()
+    ma5_history = df['ma5'].tolist() if 'ma5' in df else []
+    ma10_history = df['ma10'].tolist() if 'ma10' in df else []
     
-    return rl_net_worths, static_net_worths, price_history, trades, time_indices
+    return rl_net_worths, static_net_worths, price_history, rl_trades, time_indices, ma_worths, ma_trades, ma5_history, ma10_history, sensitivity_data
 
 if __name__ == "__main__":
-    # Needs a valid dataframe for testing
     pass
