@@ -1,12 +1,20 @@
 import os
 import sys
 import pandas as pd
-import matplotlib.pyplot as plt
-from stable_baselines3 import PPO
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from trading_env.grid_trading_env import GridTradingEnv
-from trading_env.improved_trading_env import ImprovedTradingEnv
+
+# Optional RL dependencies - gracefully degrade if not available (e.g. Python 3.14 on Streamlit Cloud)
+try:
+    from stable_baselines3 import PPO
+    from trading_env.grid_trading_env import GridTradingEnv
+    from trading_env.improved_trading_env import ImprovedTradingEnv
+    RL_AVAILABLE = True
+except Exception:
+    RL_AVAILABLE = False
+    PPO = None
+    GridTradingEnv = None
+    ImprovedTradingEnv = None
 
 def calculate_ma_strategy(df: pd.DataFrame, buffer_pct: float = 0.0):
     """
@@ -79,45 +87,53 @@ def run_sensitivity_analysis(df: pd.DataFrame, start_pct: float = 0.0, end_pct: 
     return results
 
 def evaluate_agent(df: pd.DataFrame, buffer_pct: float = 0.0, model_path: str = "models/ppo_grid_bot.zip"):
-    # Load Model
-    model = None
-    if os.path.exists(model_path):
-        model = PPO.load(model_path)
-    
     rl_net_worths = []
     rl_trades = []
-    
-    if model:
-        # Detect Model Version by Observation Space
-        obs_dim = model.observation_space.shape[0]
-        
-        if obs_dim == 18:
-            # Evaluate Artemis V2
-            rl_env = ImprovedTradingEnv(df)
-        else:
-            # Evaluate Legacy V1 Grid Bot
-            rl_env = GridTradingEnv(df)
-            
-        obs, _ = rl_env.reset()
-        done = False
-        while not done:
-            action, _states = model.predict(obs, deterministic=True)
-            obs, reward, done, truncated, info = rl_env.step(action)
-            rl_net_worths.append(info['net_worth'])
-            rl_trades = info.get('trades', [])
-            if done or truncated: break
-    
+
+    if RL_AVAILABLE:
+        # Load Model
+        model = None
+        if os.path.exists(model_path):
+            try:
+                model = PPO.load(model_path)
+            except Exception as e:
+                print(f"Could not load model: {e}")
+
+        if model:
+            # Detect Model Version by Observation Space
+            obs_dim = model.observation_space.shape[0]
+            rl_env = ImprovedTradingEnv(df) if obs_dim == 18 else GridTradingEnv(df)
+            obs, _ = rl_env.reset()
+            done = False
+            while not done:
+                action, _states = model.predict(obs, deterministic=True)
+                obs, reward, done, truncated, info = rl_env.step(action)
+                rl_net_worths.append(info['net_worth'])
+                rl_trades = info.get('trades', [])
+                if done or truncated: break
+
     # Evaluate Static Grid
-    static_env = GridTradingEnv(df)
     static_net_worths = []
     static_trades = []
-    obs, _ = static_env.reset()
-    done = False
-    while not done:
-        obs, reward, done, truncated, info = static_env.step([0.0, 0.0])
-        static_net_worths.append(info['net_worth'])
-        static_trades = info.get('trades', [])
-        if done or truncated: break
+
+    if RL_AVAILABLE and GridTradingEnv:
+        try:
+            static_env = GridTradingEnv(df)
+            obs, _ = static_env.reset()
+            done = False
+            while not done:
+                obs, reward, done, truncated, info = static_env.step([0.0, 0.0])
+                static_net_worths.append(info['net_worth'])
+                static_trades = info.get('trades', [])
+                if done or truncated: break
+        except Exception as e:
+            print(f"Static grid failed: {e}")
+    else:
+        # Fallback: simulate simple buy-and-hold as static baseline
+        initial = 10000.0
+        start_price = df['close'].iloc[0]
+        for price in df['close']:
+            static_net_worths.append(initial * (price / start_price))
 
     # Evaluate MA Strategy
     ma_worths, ma_trades = calculate_ma_strategy(df, buffer_pct)
