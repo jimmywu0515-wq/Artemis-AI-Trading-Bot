@@ -5,7 +5,7 @@ from plotly.subplots import make_subplots
 import sys
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 import numpy as np
 import ccxt
 
@@ -29,7 +29,6 @@ st.markdown("""
 
 st.title("🤖 Artemis AI Trading Dashboard")
 st.markdown("Professional Reinforcement Learning & Technical Strategy Analysis")
-st.info("💡 **Economic Mode:** Real-world 0.1% Trading Fees are now enabled for all strategies to ensure fair comparison.")
 
 # Sidebar Controls
 st.sidebar.header("🕹️ Control Center")
@@ -37,6 +36,11 @@ symbol = st.sidebar.selectbox("Market Symbol", ["BTC/USDT", "ETH/USDT", "SOL/USD
 lookback = st.sidebar.slider("Lookback Period (Hours)", 100, 2000, 1500, 100)
 buffer_pct = st.sidebar.slider("Sell Buffer %", 0.0, 5.0, 1.0, 0.1) / 100.0
 show_ma = st.sidebar.checkbox("Show Moving Averages (5/10)", value=True)
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("🧠 Model Version")
+model_type = st.sidebar.radio("Active Agent", ["Artemis V2 (Advanced)", "Classic Grid Bot"])
+model_path = "models/artemis_v2.zip" if model_type == "Artemis V2 (Advanced)" else "models/ppo_grid_bot.zip"
 
 @st.cache_data(ttl=300)
 def get_data(symbol, limit=1000):
@@ -89,7 +93,7 @@ if st.sidebar.button("🚀 Run Full Evaluation"):
     with st.spinner("Analyzing Market Dynamics..."):
         # Run Evaluation
         (rl_worth, static_worth, prices, rl_trades, time_indices, 
-         ma_worth, ma_trades, ma5, ma10, sensitivity, static_trades) = evaluate_agent(df, buffer_pct)
+         ma_worth, ma_trades, ma5, ma10, sensitivity, static_trades) = evaluate_agent(df, buffer_pct, model_path)
         
         # Metrics Row
         col1, col2, col3, col4 = st.columns(4)
@@ -100,9 +104,9 @@ if st.sidebar.button("🚀 Run Full Evaluation"):
         col1.metric("Current Price", f"${df['close'].iloc[-1]:,.2f}")
         
         if not rl_worth:
-            col2.metric("RL Bot (Smart Aggressive)", "$10,000.00", "OFFLINE")
+            col2.metric(f"RL Agent ({model_type})", "$10,000.00", "OFFLINE")
         else:
-            col2.metric("RL Bot (Smart Aggressive)", f"${rl_final:,.2f}", f"{((rl_final/10000)-1)*100:.2f}%")
+            col2.metric(f"RL Agent ({model_type})", f"${rl_final:,.2f}", f"{((rl_final/10000)-1)*100:.2f}%")
             
         col3.metric("MA Cross Strategy", f"${ma_final:,.2f}", f"{((ma_final/10000)-1)*100:.2f}%")
         col4.metric("Static Grid Baseline", f"${static_final:,.2f}", f"{((static_final/10000)-1)*100:.2f}%")
@@ -131,7 +135,7 @@ if st.sidebar.button("🚀 Run Full Evaluation"):
                              name=f"MA {t['type'].upper()}"), row=1, col=1)
 
         # Performance Chart
-        fig.add_trace(go.Scatter(x=df.index, y=rl_worth, line=dict(color='#8b5cf6', width=2), name="RL Strategy"), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=rl_worth, line=dict(color='#8b5cf6', width=2), name=f"RL {model_type}"), row=2, col=1)
         fig.add_trace(go.Scatter(x=df.index, y=ma_worth, line=dict(color='#f59e0b', width=1), name="MA Strategy"), row=2, col=1)
         fig.add_trace(go.Scatter(x=df.index, y=static_worth, line=dict(color='#64748b', width=1, dash='dot'), name="Static Baseline"), row=2, col=1)
 
@@ -139,7 +143,7 @@ if st.sidebar.button("🚀 Run Full Evaluation"):
         st.plotly_chart(fig, use_container_width=True)
 
         # Combined Trade History Table
-        st.subheader("📝 Master Trade History (Fee Aware)")
+        st.subheader("📝 Master Trade History")
         
         combined_trades = []
         def add_to_combined(trades, strategy_name):
@@ -154,7 +158,7 @@ if st.sidebar.button("🚀 Run Full Evaluation"):
                         "Fee Paid": fee_val
                     })
         
-        add_to_combined(rl_trades, "RL Agent")
+        add_to_combined(rl_trades, f"RL ({model_type})")
         add_to_combined(ma_trades, "MA Cross")
         add_to_combined(static_trades, "Static Grid")
         
@@ -166,13 +170,6 @@ if st.sidebar.button("🚀 Run Full Evaluation"):
             st.dataframe(trade_df, use_container_width=True)
         else:
             st.info("No trades executed.")
-
-        # Aggressive Mode Insights
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("### 🛠️ Optimization Active")
-        st.sidebar.write("- Risk Reward Ratio refined")
-        st.sidebar.write("- Transaction Costs modelled")
-        st.sidebar.write("- Drawdown tolerance increased")
 
         # Sensitivity Analysis
         st.subheader("📊 MA Strategy Buffer Sensitivity")
@@ -186,7 +183,7 @@ if st.sidebar.button("🚀 Run Full Evaluation"):
 
 else:
     st.info("👈 Use the Sidebar to configure your strategy and click 'Run Full Evaluation' to begin!")
-    st.image("https://images.unsplash.com/photo-1611974717484-2a62372f4f2c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80", caption="Artemis AI - Multi-Strategy Platform Ready")
+    st.image("https://images.unsplash.com/photo-1611974717484-2a62372f4f2c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80", caption="Artemis AI - Advanced Multi-Strategy Platform")
 
 st.sidebar.markdown("---")
-st.sidebar.info("Developed by Artemis AI Systems. Aggressive Optimization Active.")
+st.sidebar.info("Developed by Artemis AI Systems. Powered by Reinforcement Learning.")

@@ -6,6 +6,7 @@ from stable_baselines3 import PPO
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from trading_env.grid_trading_env import GridTradingEnv
+from trading_env.improved_trading_env import ImprovedTradingEnv
 
 def calculate_ma_strategy(df: pd.DataFrame, buffer_pct: float = 0.0):
     """
@@ -87,8 +88,16 @@ def evaluate_agent(df: pd.DataFrame, buffer_pct: float = 0.0, model_path: str = 
     rl_trades = []
     
     if model:
-        # Evaluate RL Agent
-        rl_env = GridTradingEnv(df)
+        # Detect Model Version by Observation Space
+        obs_dim = model.observation_space.shape[0]
+        
+        if obs_dim == 18:
+            # Evaluate Artemis V2
+            rl_env = ImprovedTradingEnv(df)
+        else:
+            # Evaluate Legacy V1 Grid Bot
+            rl_env = GridTradingEnv(df)
+            
         obs, _ = rl_env.reset()
         done = False
         while not done:
