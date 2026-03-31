@@ -1,0 +1,32 @@
+name: artemis-trading-bot
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - numpy<2.0.0
+      - pandas>=2.0.0
+      - stable-baselines3>=2.2.0
+      - gymnasium>=0.28.0
+      - torch>=2.0.0
+      - ccxt>=4.0.0
+      - ta>=0.11.0
+      - psycopg2-binary>=2.9.0
+      - streamlit>=1.32.0
+      - plotly>=5.18.0
+      - matplotlib>=3.7.0
+      - python-dotenv>=1.0.0
+      - tensorboard
+      - langchain
+      - langchain-openai
+      - langchain-community
+      - langchain-core
+      - openai
+      - chromadb
+      - faiss-cpu
+      - beautifulsoup4
+      - sentence-transformers
+      - aiosqlite
+      - lxml
