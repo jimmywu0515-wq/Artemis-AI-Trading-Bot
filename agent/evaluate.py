@@ -9,12 +9,14 @@ try:
     from stable_baselines3 import PPO
     from trading_env.grid_trading_env import GridTradingEnv
     from trading_env.improved_trading_env import ImprovedTradingEnv
+    from trading_env.triple_barrier_env import TripleBarrierTradingEnv
     RL_AVAILABLE = True
 except Exception:
     RL_AVAILABLE = False
     PPO = None
     GridTradingEnv = None
     ImprovedTradingEnv = None
+    TripleBarrierTradingEnv = None
 
 def calculate_ma_strategy(df: pd.DataFrame, buffer_pct: float = 0.0):
     """
@@ -102,7 +104,13 @@ def evaluate_agent(df: pd.DataFrame, buffer_pct: float = 0.0, model_path: str = 
         if model:
             # Detect Model Version by Observation Space
             obs_dim = model.observation_space.shape[0]
-            rl_env = ImprovedTradingEnv(df) if obs_dim == 18 else GridTradingEnv(df)
+            if obs_dim == 20:
+                rl_env = TripleBarrierTradingEnv(df)
+            elif obs_dim == 18:
+                rl_env = ImprovedTradingEnv(df)
+            else:
+                rl_env = GridTradingEnv(df)
+
             obs, _ = rl_env.reset()
             done = False
             while not done:

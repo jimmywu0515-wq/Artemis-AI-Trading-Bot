@@ -39,8 +39,13 @@ show_ma = st.sidebar.checkbox("Show Moving Averages (5/10)", value=True)
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("🧠 Model Version")
-model_type = st.sidebar.radio("Active Agent", ["Artemis V2 (Advanced)", "Classic Grid Bot"])
-model_path = "models/artemis_v2.zip" if model_type == "Artemis V2 (Advanced)" else "models/ppo_grid_bot.zip"
+model_type = st.sidebar.radio("Active Agent", ["Artemis Triple-Barrier", "Artemis V2 (Advanced)", "Classic Grid Bot"])
+if model_type == "Artemis Triple-Barrier":
+    model_path = "models/artemis_tb_v1.zip"
+elif model_type == "Artemis V2 (Advanced)":
+    model_path = "models/artemis_v2.zip"
+else:
+    model_path = "models/ppo_grid_bot.zip"
 
 @st.cache_data(ttl=300)
 def get_data(symbol, limit=1000):
